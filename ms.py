@@ -1,15 +1,5 @@
 #!/usr/bin/env python3
 
-# template code
-#   ?: unknown cell, need to determine whether this position is a bump
-#   .: non-bump cell: {0-9, wall}
-#   s: signature cell: {1-9}, used to group boards
-#
-#   ?????
-#   .sss.
-#   .....
-
-
 from io import BytesIO
 
 import cairo
@@ -33,7 +23,14 @@ class Board():
                       self.width for y in range(self.height)]
         self.signatures = {}
 
-    def calculate(self) -> None:
+    def common_chars(lines: list) -> str:
+        common = ''
+        n = len(lines)
+        for v in zip(*lines):
+            common += v[0] if v.count(v[0]) == n else Board.UNKNOWN_CELL
+        return common
+
+    def compute_signature(self) -> None:
         board = ''
         key = ''
         for y in range(self.height):
@@ -60,13 +57,6 @@ class Board():
         else:
             self.signatures[key] = [board]
 
-    def common_chars(lines: list) -> str:
-        common = ''
-        n = len(lines)
-        for v in zip(*lines):
-            common += v[0] if v.count(v[0]) == n else Board.UNKNOWN_CELL
-        return common
-
     def draw_cell(context: object, x: int, y: int, cell_size: int, text: str, background_color: tuple, frame_color: tuple, text_color: tuple) -> None:
         if background_color:
             context.rectangle(x, y, cell_size, cell_size)
@@ -84,7 +74,7 @@ class Board():
             context.set_source_rgb(*text_color)
             context.show_text(text)
 
-    def draw_string(s: str, cell_size: int = 20, font_size: int = 12) -> None:
+    def draw_string(s: str, cell_size: int = 20, font_family: str = 'Consolas', font_size: int = 12) -> None:
         s = [list(v) for v in s.strip().splitlines()]
 
         height = len(s)
@@ -93,8 +83,7 @@ class Board():
         svgio = BytesIO()
         with cairo.SVGSurface(svgio, width*cell_size, height*cell_size) as surface:
             context = cairo.Context(surface)
-            context.select_font_face(
-                'Courier', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            context.select_font_face(font_family)
             context.set_font_size(font_size)
             context.set_line_width(1)
 
@@ -103,51 +92,66 @@ class Board():
                     if s[y][x] == ' ':
                         continue
                     if s[y][x] == '?':
-                        Board.draw_cell(
-                            context, x*cell_size, y*cell_size, cell_size, s[y][x], (1, .5, 0), (0, 0, 0), (1, 1, 1))
+                        kwargs = {  # {{{
+                            'background_color': (1, .5, 0),
+                            'frame_color': (0, 0, 0),
+                            'text_color': (1, 1, 1)
+                        }  # }}}
                     elif s[y][x] == '|':
-                        Board.draw_cell(
-                            context, x*cell_size, y*cell_size, cell_size, s[y][x], (0, 0, 0), None, None)
+                        kwargs = {  # {{{
+                            'background_color': (0, 0, 0),
+                            'frame_color': None,
+                            'text_color': None
+                        }  # }}}
                     elif s[y][x] == Board.BUMP_CELL:
-                        Board.draw_cell(
-                            context, x*cell_size, y*cell_size, cell_size, s[y][x], (1, .2, .2), (0, 0, 0), (1, 1, 1))
+                        kwargs = {  # {{{
+                            'background_color': (1, .2, .2),
+                            'frame_color': (0, 0, 0),
+                            'text_color': (1, 1, 1)
+                        }  # }}}
                     elif s[y][x] == Board.NON_BUMP_CELL:
-                        Board.draw_cell(
-                            context, x*cell_size, y*cell_size, cell_size, s[y][x], (0, .8, 0), (0, 0, 0), (1, 1, 1))
+                        kwargs = {  # {{{
+                            'background_color': (0, .8, 0),
+                            'frame_color': (0, 0, 0),
+                            'text_color': (1, 1, 1)
+                        }  # }}}
                     else:
-                        Board.draw_cell(
-                            context, x*cell_size, y*cell_size, cell_size, s[y][x], None, (0, 0, 0), (0, 0, 0))
+                        kwargs = {  # {{{
+                            'background_color': None,
+                            'frame_color': (0, 0, 0),
+                            'text_color': (0, 0, 0)
+                        }  # }}}
+                    Board.draw_cell(
+                        context, x*cell_size, y*cell_size, cell_size, s[y][x], **kwargs)
         display(SVG(data=svgio.getvalue()))
 
-    def show_signature(self, string: bool = True, figure: bool = False) -> None:
+    def show_signature(self, string: bool = True, figure: bool = False, **kwargs) -> None:
         for signature, boards in self.signatures.items():
             print(signature, len(boards))
             s = ''
             lines = [v.splitlines() for v in boards]
             for line in zip(*lines):
                 common = Board.common_chars(line)
-                s += common + '|' + ' '.join(line) + '\n'
+                s += common + '  ' + ' '.join(line) + '\n'
             if string:
                 print(s)
             if figure:
-                Board.draw_string(s)
+                Board.draw_string(s, **kwargs)
 
     def solve(self, x: int = 0, y: int = 0) -> None:
         if x == self.width:
             x = 0
             y += 1
         if y == self.height:
-            self.calculate()
+            self.compute_signature()
             return
-        cell = self.template[y][x]
-        if cell == Board.UNKNOWN_CELL:
-            self.solve(x+1, y)  # try (x, y) has no bump
+        if self.template[y][x] == Board.UNKNOWN_CELL:
+            # assume that (x, y) has a bump
             self.bumps[y][x] = Board.BUMP_CELL
-            if self.validate(x, y):  # try (x, y) has a bump
+            if self.validate(x, y):
                 self.solve(x+1, y)
             self.bumps[y][x] = Board.NON_BUMP_CELL  # restore
-        else:
-            self.solve(x+1, y)
+        self.solve(x+1, y)
 
     def validate(self, x: int, y: int) -> bool:
         return True
@@ -157,8 +161,15 @@ class Board():
         return True
 
 
-def minesweeper():
-
+if __name__ == '__main__':
+    # template code
+    #   ?: unknown cell, need to determine whether this position is a bump
+    #   .: non-bump cell: {0-9, wall}
+    #   s: signature cell: {1-9}, used to group boards
+    #
+    #   ?????
+    #   .sss.
+    #   .....
     board = Board('''
 ?????
 .sss.
@@ -166,7 +177,3 @@ def minesweeper():
 ''')
     board.solve()
     board.show_signature(figure=True)
-
-
-if __name__ == '__main__':
-    minesweeper()
