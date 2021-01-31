@@ -22,12 +22,14 @@ class Minesweeper():
     SOLVED_SAFE = 'o'
     SOLVED_UNKNOWN = '-'
 
-    ANY_CELL = '.'
-    BUMP_CELL = 'x'
-    NUMBER_CELLS = '0123456789'
-    NON_BUMP_CELL = 'o'
-    SIGNATURE_CELL = 's'
-    UNKNOWN_CELL = '?'
+    COLORS = {
+        'default': [None, (0, 0, 0), (0, 0, 0)],
+        ' ': [None, None, None],
+        '|': [(0, 0, 0), None, None],
+        SOLVED_BUMP: [(1, .2, .2), (0, 0, 0), (1, 1, 1)],
+        SOLVED_SAFE: [(0, .8, 0), (0, 0, 0), (1, 1, 1)],
+        SOLVED_UNKNOWN: [(1, .5, 0), (0, 0, 0), (1, 1, 1)],
+    }
 
     def __init__(self, template: str, cell_size: int = 20, font_family: str = 'Consolas', font_size: int = 12) -> None:
         self.template = [list(v) for v in template.strip().splitlines()]
@@ -55,13 +57,13 @@ class Minesweeper():
                 code = boards[0][y][x]
                 n_common = sum([1 for board in boards if board[y][x] == code])
                 common[y].append(code if n_common ==
-                                 n else Minesweeper.UNKNOWN_CELL)
+                                 n else Minesweeper.SOLVED_UNKNOWN)
         return common
 
     def compute_bumps(self, x: int, y: int) -> int:
         n_bumps = 0
         for x2, y2 in [(x+i, y+j) for i, j in Minesweeper.NEARBY]:
-            if 0 <= x2 < self.width and 0 <= y2 < self.height and self.bumps[y2][x2] == Minesweeper.BUMP_CELL:
+            if 0 <= x2 < self.width and 0 <= y2 < self.height and self.bumps[y2][x2] == Minesweeper.SOLVED_BUMP:
                 n_bumps += 1
         return n_bumps
 
@@ -71,15 +73,15 @@ class Minesweeper():
         for y in range(self.height):
             board.append([])
             for x in range(self.width):
-                if self.template[y][x] == Minesweeper.UNKNOWN_CELL:
+                if self.template[y][x] == Minesweeper.TEMPLATE_UNKNOWN:
                     board[y].append(self.bumps[y][x])
-                elif self.template[y][x] == Minesweeper.SIGNATURE_CELL:
+                elif self.template[y][x] == Minesweeper.TEMPLATE_SIGNATURE:
                     n_bumps = str(self.compute_bumps(x, y))
                     if n_bumps == '0':
                         return
                     board[y].append(n_bumps)
                     signature += n_bumps
-                elif self.template[y][x] in Minesweeper.NUMBER_CELLS:
+                elif self.template[y][x] in Minesweeper.TEMPLATE_NUMBER:
                     if str(self.compute_bumps(x, y)) != self.template[y][x]:
                         return
                     board[y].append(self.template[y][x])
@@ -90,57 +92,6 @@ class Minesweeper():
             self.signatures[signature].append(board)
         else:
             self.signatures[signature] = [board]
-
-    def draw_string(s: str, cell_size: int = 20, font_family: str = 'Consolas', font_size: int = 12) -> None:
-        s = [list(v) for v in s.strip().splitlines()]
-
-        height = len(s)
-        width = len(s[0])
-
-        svgio = BytesIO()
-        with cairo.SVGSurface(svgio, width*cell_size, height*cell_size) as surface:
-            context = cairo.Context(surface)
-            context.select_font_face(font_family)
-            context.set_font_size(font_size)
-            context.set_line_width(1)
-
-            for y in range(height):
-                for x in range(width):
-                    if s[y][x] == ' ':
-                        continue
-                    if s[y][x] == '?':
-                        kwargs = {  # {{{
-                            'background_color': (1, .5, 0),
-                            'frame_color': (0, 0, 0),
-                            'text_color': (1, 1, 1)
-                        }  # }}}
-                    elif s[y][x] == '|':
-                        kwargs = {  # {{{
-                            'background_color': (0, 0, 0),
-                            'frame_color': None,
-                            'text_color': None
-                        }  # }}}
-                    elif s[y][x] == Minesweeper.BUMP_CELL:
-                        kwargs = {  # {{{
-                            'background_color': (1, .2, .2),
-                            'frame_color': (0, 0, 0),
-                            'text_color': (1, 1, 1)
-                        }  # }}}
-                    elif s[y][x] == Minesweeper.NON_BUMP_CELL:
-                        kwargs = {  # {{{
-                            'background_color': (0, .8, 0),
-                            'frame_color': (0, 0, 0),
-                            'text_color': (1, 1, 1)
-                        }  # }}}
-                    else:
-                        kwargs = {  # {{{
-                            'background_color': None,
-                            'frame_color': (0, 0, 0),
-                            'text_color': (0, 0, 0)
-                        }  # }}}
-                    Minesweeper.draw_cell(
-                        context, x*cell_size, y*cell_size, cell_size, s[y][x], **kwargs)
-        display(SVG(data=svgio.getvalue()))
 
     def open_output(self, n_boards: int, cell_size: int = 20, figure: bool = False, text: bool = True,
                     font_family: str = 'Consolas', font_size: int = 12, line_width: int = 1) -> None:
@@ -158,7 +109,11 @@ class Minesweeper():
             self.surface = None
         self.text = '' if text else None
 
-    def output_cell(self, text: str, background_color: tuple, frame_color: tuple, text_color: tuple) -> None:
+    def output_cell(self, text: str) -> None:
+        if text in Minesweeper.COLORS:
+            background_color, frame_color, text_color = Minesweeper.COLORS[text]
+        else:
+            background_color, frame_color, text_color = Minesweeper.COLORS['default']
         if self.surface is not None:
             ctx, size, x, y = cairo.Context(
                 self.surface), self.cell_size, self.x, self.y  # abbreviation
@@ -193,15 +148,14 @@ class Minesweeper():
             for y in range(self.height):
                 # common
                 for x in range(self.width):
-                    self.output_cell(common[y][x], None, (0, 0, 0), (0, 0, 0))
-                self.output_cell(' ', None, None, None)
+                    self.output_cell(common[y][x])
+                self.output_cell(' ')
 
                 # per board
                 for board in boards:
                     for x in range(self.width):
-                        self.output_cell(board[y][x], None,
-                                         (0, 0, 0), (0, 0, 0))
-                    self.output_cell('|', (0, 0, 0), None, None)
+                        self.output_cell(board[y][x])
+                    self.output_cell('|')
                 self.output_newline()
             self.close_output()
 
@@ -211,12 +165,12 @@ class Minesweeper():
         if y == self.height:
             self.compute_signature()
             return
-        if self.template[y][x] == Minesweeper.UNKNOWN_CELL:
+        if self.template[y][x] == Minesweeper.TEMPLATE_UNKNOWN:
             # assume that (x, y) has a bump
-            self.bumps[y][x] = Minesweeper.BUMP_CELL
+            self.bumps[y][x] = Minesweeper.SOLVED_BUMP
             if self.validate(x, y):
                 self.solve(x+1, y)
-            self.bumps[y][x] = Minesweeper.NON_BUMP_CELL  # restore
+            self.bumps[y][x] = Minesweeper.SOLVED_SAFE  # restore
         self.solve(x+1, y)
 
     def validate(self, x: int, y: int) -> bool:
@@ -245,7 +199,7 @@ if __name__ == '__main__':
     #   ?????
     ms = Minesweeper('''
 .....
-.sss.
+.###.
 ?????
 ''')
     ms.solve()
