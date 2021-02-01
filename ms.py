@@ -103,10 +103,11 @@ class Minesweeper():
             self.svgio = BytesIO()
             self.surface = cairo.SVGSurface(
                 self.svgio, ((n_boards+1)*(self.width+1)-1)*cell_size, self.height*cell_size)
-            self.context = cairo.Context(self.surface)
-            self.context.select_font_face(font_family)
-            self.context.set_font_size(font_size)
-            self.context.set_line_width(line_width)
+            ctx = cairo.Context(self.surface)
+            ctx.select_font_face(font_family)
+            ctx.set_font_size(font_size)
+            ctx.set_line_width(line_width)
+            self.context = ctx  # save context to speed up
         else:
             self.surface = None
         self.text = '' if text else None
@@ -121,8 +122,7 @@ class Minesweeper():
         else:
             background_color, frame_color, text_color = Minesweeper.COLORS['default']
         if self.surface is not None:
-            ctx, size, x, y = cairo.Context(
-                self.surface), self.cell_size, self.x, self.y  # abbreviation
+            ctx, size, x, y = self.context, self.cell_size, self.x, self.y  # abbreviation
             if background_color:
                 ctx.rectangle(x, y, size, size)
                 ctx.set_source_rgb(*background_color)
@@ -132,7 +132,7 @@ class Minesweeper():
                 ctx.set_source_rgb(*frame_color)
                 ctx.stroke()
             if text_color:
-                _, _, w, h, _, _ = self.context.text_extents(text)
+                _, _, w, h, _, _ = ctx.text_extents(text)
                 ctx.move_to(x + size/2 - w/2, y + size/2 + h/2)
                 ctx.set_source_rgb(*text_color)
                 ctx.show_text(text)
@@ -200,4 +200,4 @@ if __name__ == '__main__':
 ?????
 ''')
     ms.solve()
-    ms.output_signature(figure=True)
+    ms.output_signature(figure=False, text=True)
