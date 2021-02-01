@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from collections import namedtuple
 from io import BytesIO
 
 import cairo
@@ -33,7 +32,7 @@ class Minesweeper():
         SOLVED_UNKNOWN: [(1, .5, 0), (0, 0, 0), (1, 1, 1)],
     }
 
-    def __init__(self, template: str, cell_size: int = 20, font_family: str = 'Consolas', font_size: int = 12) -> None:
+    def __init__(self, template: str) -> None:
         self.template = [list(v) for v in template.strip().splitlines()]
         self.height = len(self.template)
         self.width = len(self.template[0])
@@ -42,13 +41,13 @@ class Minesweeper():
         self.signatures = {}
 
     def close_output(self):
+        if self.text is not None:
+            print(self.text)
+            self.text = None
         if self.surface is not None:
             self.surface.finish()
             display(SVG(data=self.svgio.getvalue()))
             self.surface = None
-        if self.text is not None:
-            print(self.text)
-            self.text = None
 
     def compute_common(self, boards: list) -> list:
         common = []
@@ -94,6 +93,21 @@ class Minesweeper():
             self.signatures[signature].append(board)
         else:
             self.signatures[signature] = [board]
+
+    def help() -> None:
+        print('''
+Template Syntax:
+  - x: bump
+  - 0-8: number
+  - .: safe, number is unknown/not a matter
+  - #: signature, solve() determines its number, 0 is not allowed
+  - ?: unknown, solve() determines whether this cell is a bump
+
+Template Sample:
+  .....
+  .##1.
+  ?????
+''')
 
     def open_output(self, n_boards: int, cell_size: int = 20, figure: bool = False, text: bool = True,
                     font_family: str = 'Consolas', font_size: int = 12, line_width: int = 1) -> None:
@@ -141,7 +155,7 @@ class Minesweeper():
             self.text += text
 
     def output_newline(self) -> None:
-        if self.context is not None:
+        if self.surface is not None:
             self.x, self.y = 0, self.y + self.cell_size
         if self.text is not None:
             self.text += '\n'
@@ -188,13 +202,8 @@ class Minesweeper():
 
 
 if __name__ == '__main__':
-    # template cell
-    #   - x: bump
-    #   - 0-8: number
-    #   - .: safe, number is unknown/not a matter
-    #   - #: signature, solve() determines its number, 0 is not allowed
-    #   - ?: unknown, solve() determines whether this cell is a bump
-    ms = Minesweeper('''
+    Minesweeper.help()
+    ms = Minesweeper(template='''
 .....
 .##1.
 ?????
