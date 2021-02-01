@@ -12,18 +12,20 @@ class Minesweeper():
     NEARBY = [[-1, -1], [0, -1], [1, -1],
               [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
 
+    SOLVED_BUMP = 'x'
+    SOLVED_SAFE = 'o'
+    SOLVED_UNKNOWN = '-'
+
     TEMPLATE_BUMP = 'x'
     TEMPLATE_NUMBER = '012345678'
     TEMPLATE_SAFE = '.'
     TEMPLATE_SIGNATURE = '#'
     TEMPLATE_UNKNOWN = '?'
 
-    SOLVED_BUMP = 'x'
-    SOLVED_SAFE = 'o'
-    SOLVED_UNKNOWN = '-'
-
     COLORS = {
         'default': [None, (0, 0, 0), (0, 0, 0)],
+        'template_number': [(.6, .8, 1), (0, 0, 0), (1, 1, 1)],
+        '#': [(.2, .6, 1), (0, 0, 0), (1, 1, 1)],
         ' ': [None, None, None],
         '|': [(0, 0, 0), None, None],
         SOLVED_BUMP: [(1, .2, .2), (0, 0, 0), (1, 1, 1)],
@@ -109,8 +111,12 @@ class Minesweeper():
             self.surface = None
         self.text = '' if text else None
 
-    def output_cell(self, text: str) -> None:
-        if text in Minesweeper.COLORS:
+    def output_cell(self, text: str, template_cell: str = None) -> None:
+        if template_cell and template_cell in Minesweeper.TEMPLATE_NUMBER:
+            background_color, frame_color, text_color = Minesweeper.COLORS['template_number']
+        elif template_cell in Minesweeper.COLORS:
+            background_color, frame_color, text_color = Minesweeper.COLORS[template_cell]
+        elif text in Minesweeper.COLORS:
             background_color, frame_color, text_color = Minesweeper.COLORS[text]
         else:
             background_color, frame_color, text_color = Minesweeper.COLORS['default']
@@ -148,13 +154,13 @@ class Minesweeper():
             for y in range(self.height):
                 # common
                 for x in range(self.width):
-                    self.output_cell(common[y][x])
+                    self.output_cell(common[y][x], self.template[y][x])
                 self.output_cell(' ')
 
                 # per board
                 for board in boards:
                     for x in range(self.width):
-                        self.output_cell(board[y][x])
+                        self.output_cell(board[y][x], self.template[y][x])
                     self.output_cell('|')
                 self.output_newline()
             self.close_output()
@@ -182,24 +188,15 @@ class Minesweeper():
 
 
 if __name__ == '__main__':
-    # template code
-    #   - unknown cell: ?
-    #     - solve() should determine whether this cell is a bump
-    #   - bump cell: x
-    #   - three non-bump cells:
-    #     - signature cell: s
-    #       - solve() should determine the number {1-9} of this cell {1-9}
-    #       - cannot be 0
-    #     - any cell: .
-    #       - this cell cannot be a bump, but its number is unknown (is not important)
-    #     - number cell: {0-9}
-    #
-    #   .....
-    #   .sss.
-    #   ?????
+    # template cell
+    #   - x: bump
+    #   - 0-8: number
+    #   - .: safe, number is unknown/not a matter
+    #   - #: signature, solve() determines its number, 0 is not allowed
+    #   - ?: unknown, solve() determines whether this cell is a bump
     ms = Minesweeper('''
 .....
-.###.
+.##1.
 ?????
 ''')
     ms.solve()
