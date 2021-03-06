@@ -11,11 +11,13 @@ class Minesweeper():
     NEARBY = [[-1, -1], [0, -1], [1, -1],
               [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
 
-    SOLVED_BUMP = 'x'
-    SOLVED_SAFE = 'o'
-    SOLVED_UNKNOWN = '-'
+    SOLVED_BUMP = 'X'
+    SOLVED_BUMPER = 'x'
+    SOLVED_SAFE = 'O'
+    SOLVED_SAFER = 'o'
+    SOLVED_UNKNOWN = '/'
 
-    TEMPLATE_BUMP = 'x'
+    TEMPLATE_BUMP = 'X'
     TEMPLATE_NUMBER = '012345678'
     TEMPLATE_SAFE = '.'
     TEMPLATE_SIGNATURE = '#'
@@ -28,7 +30,9 @@ class Minesweeper():
         ' ': [None, None, None],
         '|': [(0, 0, 0), None, None],
         SOLVED_BUMP: [(1, .2, .2), (0, 0, 0), (1, 1, 1)],
+        SOLVED_BUMPER: [(1, .4, .4), (0, 0, 0), (1, 1, 1)],
         SOLVED_SAFE: [(0, .8, 0), (0, 0, 0), (1, 1, 1)],
+        SOLVED_SAFER: [(0, .6, 0), (0, 0, 0), (1, 1, 1)],
         SOLVED_UNKNOWN: [(1, .5, 0), (0, 0, 0), (1, 1, 1)],
     }
 
@@ -36,8 +40,12 @@ class Minesweeper():
         self.template = [list(v) for v in template.strip().splitlines()]
         self.height = len(self.template)
         self.width = len(self.template[0])
-        self.bumps = [[Minesweeper.SOLVED_SAFE] *
-                      self.width for y in range(self.height)]
+        self.bumps = []
+        for y in range(self.height):
+            self.bumps.append([])
+            for x in range(self.width):
+                self.bumps[y].append(Minesweeper.SOLVED_BUMP if self.template[y][x] == Minesweeper.TEMPLATE_BUMP else Minesweeper.SOLVED_SAFE)
+        self.commons = {}
         self.signatures = {}
 
     def close_output(self):
@@ -49,16 +57,44 @@ class Minesweeper():
             display(SVG(data=self.svgio.getvalue()))
             self.surface = None
 
-    def compute_common(self, boards: list) -> list:
+    def compute_common(self, signature: str, boards: list) -> list:
         common = []
+        unknown_common = ''
+
         n = len(boards)
         for y in range(self.height):
             common.append([])
             for x in range(self.width):
-                code = boards[0][y][x]
-                n_common = sum([1 for board in boards if board[y][x] == code])
-                common[y].append(code if n_common ==
-                                 n else Minesweeper.SOLVED_UNKNOWN)
+                n_bump = sum([1 for board in boards if board[y][x] == Minesweeper.SOLVED_BUMP])
+                n_safe = sum([1 for board in boards if board[y][x] == Minesweeper.SOLVED_SAFE])
+                if self.template[y][x] == Minesweeper.TEMPLATE_UNKNOWN:
+                    if n_bump == n:
+                        code = Minesweeper.SOLVED_BUMP
+                    elif n_safe == n:
+                        code = Minesweeper.SOLVED_SAFE
+                    elif n_bump > n_safe:
+                        code = Minesweeper.SOLVED_BUMPER
+                    elif n_bump < n_safe:
+                        code = Minesweeper.SOLVED_SAFER
+                    else:
+                        code = Minesweeper.SOLVED_UNKNOWN
+                    common[y].append(code)
+                    unknown_common += code
+                else:
+                    common[y].append(boards[0][y][x])
+
+        n = len(unknown_common)
+        for i, v in enumerate(unknown_common):
+            if i * 2 + 1 != n:
+                continue
+            k = ['-'] * n
+            k[i] = v
+            k = ''.join(k)
+            if k in self.commons:
+                self.commons[k].append(signature)
+            else:
+                self.commons[k] = [signature]
+
         return common
 
     def compute_bumps(self, x: int, y: int) -> int:
@@ -162,8 +198,9 @@ Template Sample:
 
     def output_signature(self, **kwargs) -> None:
         for signature, boards in [(k, self.signatures[k]) for k in sorted(self.signatures.keys())]:
-            print(signature, len(boards))
-            common = self.compute_common(boards)
+            if kwargs['figure'] or kwargs['text']:
+                print(signature, len(boards))
+            common = self.compute_common(signature, boards)
             self.open_output(len(boards), **kwargs)
             for y in range(self.height):
                 # common
@@ -172,10 +209,11 @@ Template Sample:
                 self.output_cell(' ')
 
                 # per board
-                for board in boards:
+                for i, board in enumerate(boards):
                     for x in range(self.width):
                         self.output_cell(board[y][x], self.template[y][x])
-                    self.output_cell('|')
+                    if i < len(boards) - 1:
+                        self.output_cell('|')
                 self.output_newline()
             self.close_output()
 
