@@ -12,9 +12,9 @@ class Minesweeper():
               [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
 
     SOLVED_BUMP = 'X'
-    SOLVED_BUMPER = 'x'
+    SOLVED_BUMPER = '/'
     SOLVED_SAFE = 'O'
-    SOLVED_SAFER = 'o'
+    SOLVED_SAFER = '/'
     SOLVED_UNKNOWN = '/'
 
     TEMPLATE_BUMP = 'X'
