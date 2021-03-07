@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 from io import BytesIO
 
 import cairo
@@ -44,7 +45,8 @@ class Minesweeper():
         for y in range(self.height):
             self.bumps.append([])
             for x in range(self.width):
-                self.bumps[y].append(Minesweeper.SOLVED_BUMP if self.template[y][x] == Minesweeper.TEMPLATE_BUMP else Minesweeper.SOLVED_SAFE)
+                self.bumps[y].append(Minesweeper.SOLVED_BUMP if self.template[y]
+                                     [x] == Minesweeper.TEMPLATE_BUMP else Minesweeper.SOLVED_SAFE)
         self.commons = {}
         self.signatures = {}
 
@@ -65,8 +67,10 @@ class Minesweeper():
         for y in range(self.height):
             common.append([])
             for x in range(self.width):
-                n_bump = sum([1 for board in boards if board[y][x] == Minesweeper.SOLVED_BUMP])
-                n_safe = sum([1 for board in boards if board[y][x] == Minesweeper.SOLVED_SAFE])
+                n_bump = sum([1 for board in boards if board[y]
+                              [x] == Minesweeper.SOLVED_BUMP])
+                n_safe = sum([1 for board in boards if board[y]
+                              [x] == Minesweeper.SOLVED_SAFE])
                 if self.template[y][x] == Minesweeper.TEMPLATE_UNKNOWN:
                     if n_bump == n:
                         code = Minesweeper.SOLVED_BUMP
@@ -237,6 +241,24 @@ Template Sample:
             if 0 <= x2 < self.width and 0 <= y2 < self.height and self.template[y2][x2] == '0':
                 return False
         return True
+
+
+def analyze_unknown_center(signature: str, radius: int = 1) -> None:
+    n = len(signature)
+    board = '.' * (n + 2 * radius + 2) + '\n'
+    board += '.' + '#' * (n + 2 * radius) + '.\n'
+    board += '?' * (n + 2 * radius + 2) + '\n'
+    board = Minesweeper(board)
+    board.solve()
+    board.output_signature(figure=False, text=False)
+    regex = '.' * radius + signature + '.' * radius
+    for k in sorted(board.commons):
+        commons = board.commons[k]
+        commons = list(filter(lambda v: not re.search('3', v), commons))
+        if radius:
+            commons = list(filter(lambda v: re.match(regex, v), commons))
+        print(k, commons)
+    print()
 
 
 if __name__ == '__main__':
